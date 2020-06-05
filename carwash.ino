@@ -3,6 +3,7 @@
 
 #define cbi(sfr, bit) (_SFR_BYTE(sfr) &= ~_BV(bit))    //clear bit in byte at sfr adress
 #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))     //set bit in byte at sfr adress
+#define seconds() (millis()/1000)  //capture secods
 
 LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
@@ -10,13 +11,20 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 const int coinPin = 2;
 const int button1 = 3, button2 = 4, button3 = 5;
 const int relay1 = 10, relay2 = 11, relay3 = 12;
-
+const int button1pushed = 0b00110000;
+const int button2pushed = 0b00101000;
+const int button3pushed = 0b00011000;
 //variables used in the Interrupt Service Routine (ISR) need to be 'volatile'
 volatile long unsigned eventTime;
 volatile long unsigned previousEventTime;
 volatile long unsigned timeSinceLastEvent;
 volatile byte portDstatus;
 volatile byte eventFlag;
+//additonal variables
+unsigned long timeSpent = 0, startTime = 0;
+volatile long unsigned timeLeft = 0;
+int coinTimeVal = 5;  //how much time per coin
+int event;
 
 void setup(){
   
@@ -29,7 +37,13 @@ void setup(){
   digitalWrite(button2, HIGH);
   pinMode(button3, INPUT);
   digitalWrite(button3, HIGH);
- 
+  pinMode(relay1, OUTPUT);
+  digitalWrite(relay1, HIGH);
+  pinMode(relay2, OUTPUT);
+  digitalWrite(relay2, HIGH);
+  pinMode(relay3, OUTPUT);
+  digitalWrite(relay3, HIGH);
+  
   //setting up the interrupt: (see chapter 12 in the ATmega328p data sheet for an explanation which register does what etc...)
   sbi (PCICR,PCIE2);//enable interrupt PCI2
   sbi (PCMSK2,PCINT21); //button3
@@ -46,17 +60,26 @@ void setup(){
 
 void loop()
 {
-  
-  if (eventFlag == 1 && (eventTime-previousEventTime>100)){//button event causes eventFlag to be set in ISR. We only consider events occurring 100ms after the last one.
+  if (timeLeft){
+    welcomeInsertCoinMessage();
+    }
+  else {
+    if (eventFlag == 1 && (eventTime-previousEventTime>50)){//button event causes eventFlag to be set in ISR. We only consider events occurring 50ms after the last one.
                                                            //This debounces the button.
-    timeSinceLastEvent = eventTime - previousEventTime;//calculate the time since the last event
-    previousEventTime=eventTime;//note the present event time as last time for the next event.
-    Serial.print(timeSinceLastEvent);//print the elapsed time (in ms) on the serial monitor
-    Serial.println(" ms");
-    Serial.println(portDstatus,BIN);//print the state of Port D as a BINary number
-                                    //in a 'real' program you would evaluate portDstatus and find out which button was pressed.
-                                    //This could be done in a 'case' strcuture or with if....then
-    eventFlag = 0;//reset the event flag for the next event
+                                                           
+      previousEventTime=eventTime;//note the present event time as last time for the next event
+      startTime = seconds();
+      event = (portDstatus|0b00111000);
+      switch(event){
+        case button1pushed:
+          break;
+        case button2pushed:
+          break;
+        case button3pushed:
+          break; 
+        }
+      eventFlag = 0;//reset the event flag for the next event
+    }
   }
 }
 
@@ -72,5 +95,23 @@ ISR (PCINT2_vect)//Interrupt Service Routine. This code is executed whenever a b
 }
 
 void coinInterrupt(){
-  
+  timeLeft += coinTimeVal; 
 }
+
+void welcomeInsertCoinMessage(){
+    lcd.clear();
+    lcd.setCursor(4, 0); //Start at character 4 on line 0
+    lcd.print("WELCOME!");
+    delay(100);
+    lcd.setCursor(0, 1);
+    lcd.print(" ->Insert Coin<-");
+  }
+
+void printStatusAndTime(String timer, String statusAction){
+    lcd.clear();
+    lcd.setCursor(0, 0);
+    lcd.print(timer);
+    delay(100);
+    lcd.setCursor(0, 1);
+    lcd.print(statusAction);
+  }
