@@ -21,9 +21,8 @@ volatile long unsigned timeSinceLastEvent;
 volatile byte portDstatus;
 volatile byte eventFlag1, eventFlag2, eventFlag3;
 //additonal variables
-unsigned long timeSpent = 0, startTime = 0;
+unsigned long timeSpent = 0, startTime = 0, coinTimeVal = 60 * 1000;
 volatile long unsigned timeLeft = 0;
-int coinTimeVal = 60 * 1000;  //how much time per coin
 int event;
 bool event1running = false, event2running = false, event3running =false;
 
@@ -120,13 +119,10 @@ void loop()
     }
     if (event1running || event2running || event3running){
       //Serial.println("running...");
-      timeSpent = millis() - startTime;
-      timeLeft -= timeSpent;
-    } else{
-      Serial.println("paused...");
+      timeLeft -= millis() - startTime;
       startTime = millis();
     }
-  }
+  }delay(100);
 }
 
 
@@ -154,11 +150,12 @@ void coinInterrupt(){
 }
 
 void welcomeInsertCoinMessage(){
+    lcd.clear();
     lcd.setCursor(4, 0); //Start at character 4 on line 0
     lcd.print("WELCOME!");
     lcd.setCursor(0, 1);
     lcd.print(" ->Insert Coin<-");
-    lcd.clear();
+    
   }
 
 void printTime(int timer){
@@ -166,17 +163,19 @@ void printTime(int timer){
     String t;
     //lcd.clear();
     lcd.setCursor(0, 0);
+    lcd.print("               ");
     mins =int(timer/(60*1000));
     secs = int((timer%(60*1000))/1000);
     if (mins > 9 and secs >9){
-      t = String("Time--") + String(mins) + String(":") + String(secs);
+      t = String("Time  ") + String(mins) + String(":") + String(secs);
     }else if (mins > 9 and secs < 10){
-      t = String("Time--") + String(mins) + String(":") + String(secs);
+      t = String("Time  ") + String(mins) + String(":") + String(secs);
     }else if (mins < 10 and secs > 9){
-      t = String("Time--") + String("0") + String(mins) + String(":") + String(secs);
+      t = String("Time  ") + String("0") + String(mins) + String(":") + String(secs);
     }else{
-      t = String("Time--") + String("0") + String(mins) + String(":") + String("0") + String(secs);
+      t = String("Time  ") + String("0") + String(mins) + String(":") + String("0") + String(secs);
     }
+    lcd.setCursor(0, 0);
     lcd.print(t);
 //    delay(100);
 //    lcd.setCursor(0, 1);
@@ -184,6 +183,8 @@ void printTime(int timer){
 }
 
 void printStatus(String s){
+  lcd.setCursor(0, 1);
+  lcd.print("               ");
   lcd.setCursor(0, 1);
   lcd.print(s);
 }
