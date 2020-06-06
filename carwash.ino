@@ -9,7 +9,7 @@ LiquidCrystal_I2C lcd(0x27, 2, 1, 0, 4, 5, 6, 7, 3, POSITIVE);
 
 //pins to use
 const int coinPin = 2;
-const int button1 = 8, button2 = A0, button3 = 4;
+const int button1 = 8, button2 = A0, button3 = 3;
 const int relay1 = 10, relay2 = 11, relay3 = 12;
 const int button1pushed = 0b00110000;
 const int button2pushed = 0b00101000;
@@ -23,7 +23,7 @@ volatile byte eventFlag1, eventFlag2, eventFlag3;
 //additonal variables
 unsigned long timeSpent = 0, startTime = 0;
 volatile long unsigned timeLeft = 0;
-int coinTimeVal = 5;  //how much time per coin
+int coinTimeVal = 60 * 1000;  //how much time per coin
 int event;
 bool event1running = false, event2running = false, event3running =false;
 
@@ -47,11 +47,12 @@ void setup(){
   
   //setting up the interrupt: (see chapter 12 in the ATmega328p data sheet for an explanation which register does what etc...)
   cli();
-  PCICR |= 0b00000111;    // turn on all ports
+  PCICR |= 0b00000011;    // turn on all ports
   PCMSK0 |= 0b00000001;    // turn on pin PB0, which is PCINT0, pin 8 
   PCMSK1 |= 0b00000001;    // turn on pin PC4, which is PCINT12, pin A0
-  PCMSK2 |= 0b00010000;    // turn on pin 4
+  //PCMSK2 |= 0b00010000;    // turn on pin 4
   sei();
+  attachInterrupt(digitalPinToInterrupt(button3), button3event, RISING);
   //lcd init
   lcd.begin(16, 2);
 
@@ -67,25 +68,26 @@ void loop()
     welcomeInsertCoinMessage();
     if (event1running){
       switchRelay(relay1, event1running);
-      event1running ^= event1running;  
+      event1running = !event1running;  
     }
     else if (event2running){
       switchRelay(relay2, event2running);
-      event2running ^= event2running;  
+      event2running = !event2running;  
     }
     else if (event3running){
       switchRelay(relay3, event3running);
-      event3running ^= event3running;  
+      event3running = !event3running;  
     }
   }
   else {
     printTime(timeLeft);
     if (eventFlag1 == 1 && (eventTime-previousEventTime>100)){
       previousEventTime=eventTime;//note the present event time as last time for the next event
-      startTime = seconds();
       switchRelay(relay1, event1running);
-      event1running ^= event1running;
+      event1running = !event1running;
+      Serial.println(event1running);
       if (event1running){
+        startTime = millis();
         printStatus("Wash...");  
       }else{
         printStatus("Washing paused"); 
@@ -94,33 +96,35 @@ void loop()
     }
     else if (eventFlag2 == 1 && (eventTime-previousEventTime>100)){
       previousEventTime=eventTime;//note the present event time as last time for the next event
-      startTime = seconds();
       switchRelay(relay2, event2running);
-      event2running ^= event2running;
+      event2running = !event2running;
       if (event2running){
-        printStatus("Wash...");  
+        startTime = millis();
+        printStatus("Soap...");  
       }else{
-        printStatus("Washing paused"); 
+        printStatus("Soap paused"); 
       }
       eventFlag2 = 0;//reset the event flag for the next event
     }
     else if (eventFlag3 == 1 && (eventTime-previousEventTime>100)){
       previousEventTime=eventTime;//note the present event time as last time for the next event
-      startTime = seconds();
       switchRelay(relay3, event3running);
-      event3running ^= event3running;
+      event3running = !event3running;
       if (event3running){
-        printStatus("Wash...");  
+        startTime = millis();
+        printStatus("Dry...");  
       }else{
-        printStatus("Washing paused"); 
+        printStatus("Dry paused"); 
       }
       eventFlag3 = 0;//reset the event flag for the next event
     }
     if (event1running || event2running || event3running){
-      timeSpent = seconds() - startTime;
+      //Serial.println("running...");
+      timeSpent = millis() - startTime;
       timeLeft -= timeSpent;
     } else{
-      startTime = seconds();
+      Serial.println("paused...");
+      startTime = millis();
     }
   }
 }
@@ -137,7 +141,11 @@ ISR (PCINT1_vect){
   eventFlag2=1;//set the event flag that tells the main loop that a button was pressed.
 }
 
-ISR (PCINT3_vect){
+//ISR (PCINT3_vect){
+//  eventTime=millis();//note the time of the ISR call  
+//  eventFlag3=1;//set the event flag that tells the main loop that a button was pressed.
+//}
+void button3event(){
   eventTime=millis();//note the time of the ISR call  
   eventFlag3=1;//set the event flag that tells the main loop that a button was pressed.
 }
@@ -154,9 +162,22 @@ void welcomeInsertCoinMessage(){
   }
 
 void printTime(int timer){
+    int mins, secs;
+    String t;
     //lcd.clear();
     lcd.setCursor(0, 0);
-    lcd.print(timer);
+    mins =int(timer/(60*1000));
+    secs = int((timer%(60*1000))/1000);
+    if (mins > 9 and secs >9){
+      t = String("Time--") + String(mins) + String(":") + String(secs);
+    }else if (mins > 9 and secs < 10){
+      t = String("Time--") + String(mins) + String(":") + String(secs);
+    }else if (mins < 10 and secs > 9){
+      t = String("Time--") + String("0") + String(mins) + String(":") + String(secs);
+    }else{
+      t = String("Time--") + String("0") + String(mins) + String(":") + String("0") + String(secs);
+    }
+    lcd.print(t);
 //    delay(100);
 //    lcd.setCursor(0, 1);
 //    lcd.print(statusAction); 
